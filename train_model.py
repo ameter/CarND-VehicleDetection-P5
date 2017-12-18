@@ -11,10 +11,10 @@ import numpy as np
 import cv2
 import glob
 import time
+
 from sklearn.svm import LinearSVC
 from sklearn.preprocessing import StandardScaler
-from skimage.feature import hog
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.externals import joblib
 
 from features import *
@@ -109,6 +109,9 @@ print('\nFeature vector length:', len(X_train[0]))
 
 # Train the model
 # Use a linear SVC
+#parameters = {'C':[1, 10]}
+#svr = LinearSVC()
+#svc = GridSearchCV(svr, parameters)
 svc = LinearSVC()
 # Check the training time for the SVC
 t = time.time()

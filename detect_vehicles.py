@@ -10,13 +10,21 @@ import cv2
 import matplotlib.image as mpimg
 import matplotlib.pyplot as plt
 from sklearn.externals import joblib
+from scipy.ndimage.measurements import label
+from glob import glob
+from moviepy.editor import VideoFileClip
 
 from features import *
 
 
+heat_threshold = 0
+heatmaps = []
+
+
 # Define a single function that can extract features using hog sub-sampling and make predictions
 def find_cars(img, ystart, ystop, scale, svc, X_scaler, cspace, orient, pix_per_cell, cell_per_block, hog_channel, spatial_size, hist_bins, hist_range):
-    draw_img = np.copy(img)
+    #draw_img = np.copy(img)
+    heat = np.zeros_like(img[:,:,0]).astype(np.float)
     img = img.astype(np.float32) / 255
 
     img_tosearch = img[ystart:ystop, :, :]
@@ -72,17 +80,92 @@ def find_cars(img, ystart, ystop, scale, svc, X_scaler, cspace, orient, pix_per_
 
             # Scale features and make a prediction
             test_features = X_scaler.transform(np.hstack((hog_features, spatial_features, hist_features)).reshape(1, -1))
-            # test_features = X_scaler.transform(np.hstack((shape_feat, hist_feat)).reshape(1, -1))
+
             test_prediction = svc.predict(test_features)
 
             if test_prediction == 1:
                 xbox_left = np.int(xleft * scale)
                 ytop_draw = np.int(ytop * scale)
                 win_draw = np.int(window * scale)
-                cv2.rectangle(draw_img, (xbox_left, ytop_draw + ystart),
-                              (xbox_left + win_draw, ytop_draw + win_draw + ystart), (0, 0, 255), 6)
+                #cv2.rectangle(draw_img, (xbox_left, ytop_draw + ystart), (xbox_left + win_draw, ytop_draw + win_draw + ystart), (0, 0, 255), 6)
+                # Generate a heatmap of detections for this image
+                box = [[xbox_left, ytop_draw + ystart],[xbox_left + win_draw, ytop_draw + win_draw + ystart]]
+                heat[box[0][1]:box[1][1], box[0][0]:box[1][0]] += 1
 
-    return draw_img
+    return heat
+
+# Returnd a copy of image with bounding boxes labeled
+def draw_labeled_bboxes(image, labels):
+    img = np.copy(image)
+    # Iterate through all detected cars
+    for car_number in range(1, labels[1]+1):
+        # Find pixels with each car_number label value
+        nonzero = (labels[0] == car_number).nonzero()
+        # Identify x and y values of those pixels
+        nonzeroy = np.array(nonzero[0])
+        nonzerox = np.array(nonzero[1])
+        # Define a bounding box based on min/max x and y
+        bbox = ((np.min(nonzerox), np.min(nonzeroy)), (np.max(nonzerox), np.max(nonzeroy)))
+        # Draw the box on the image
+        cv2.rectangle(img, bbox[0], bbox[1], (0,0,255), 6)
+    # Return the image
+    return img
+
+
+def process_image(img):
+    # Get a heatmap of detected cars
+    heatmaps.append(find_cars(img, ystart, ystop, scale, svc, X_scaler, colorspace, orient, pix_per_cell, cell_per_block,
+                     hog_channel, spatial_size, hist_bins, hist_range))
+
+    if len(heatmaps) > heat_smoothing:
+        heatmaps.pop(0)
+
+    heat = np.sum(heatmaps, axis=0)
+
+    # Apply a threshold to the detections heatmap and zero out pixels below the threshold
+    heat[heat <= heat_threshold] = 0
+
+    # Find final boxes from heatmap using label function
+    labels = label(heat)
+    return draw_labeled_bboxes(img, labels)
+
+
+def test_images():
+    global heatmaps, heat_threshold
+    heat_threshold = 2
+
+    # Get image filenames
+    img_filenames = glob("./test_images/test*.jpg")
+
+    for img_filename in img_filenames:
+        # Load test image
+        img = mpimg.imread(img_filename)
+        # Clear heatmap
+        heatmaps = []
+        # Process image and write result
+        mpimg.imsave("./output_images/" + img_filename.split("/")[-1], process_image(img))
+
+
+def test_video():
+    global heatmaps, heat_threshold
+    heat_threshold = 50
+    # Clear heatmap
+    heatmaps = []
+    ## To speed up the testing process you may want to try your pipeline on a shorter subclip of the video
+    ## To do so add .subclip(start_second,end_second) to the end of the line below
+    ## Where start_second and end_second are integer values representing the start and end of the subclip
+    ## You may also uncomment the following line for a subclip of the first 5 seconds
+    #clip = VideoFileClip("./project_video.mp4").subclip(39, 42)
+    clip = VideoFileClip("./test_video.mp4")
+    #clip = VideoFileClip("./project_video.mp4")
+
+    # Process the video
+    result = clip.fl_image(process_image)  # NOTE: this function expects color images!!
+
+    # Save the processed video
+    result.write_videofile("./output_images/output_video.mp4", audio=False)
+
+
 
 
 
@@ -108,11 +191,20 @@ ystart = 400
 ystop = 656
 scale = 1.5
 
+heat_smoothing = 15
+
 # Load test image
-img = mpimg.imread('./test_images/test1.jpg')
+# img = mpimg.imread('./test_images/test1.jpg')
 
-out_img = find_cars(img, ystart, ystop, scale, svc, X_scaler, colorspace, orient, pix_per_cell, cell_per_block, hog_channel, spatial_size, hist_bins, hist_range)
+test_images()
+#test_video()
 
-plt.imshow(out_img)
-plt.show()
+# plt.imshow(draw_img)
+# plt.show()
+#
+# # Visualize the heatmap when displaying
+# heatmap = np.clip(heat, 0, 255)
+#
+# plt.imshow(heatmap, cmap='hot')
+# plt.show()
 
