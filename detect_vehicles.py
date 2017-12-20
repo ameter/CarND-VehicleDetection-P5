@@ -16,9 +16,13 @@ from moviepy.editor import VideoFileClip
 
 from features import *
 
+DEBUG = False
 
 heat_threshold = 0
+heat_smoothing = 1
 heatmaps = []
+
+frame = 0
 
 
 # Define a single function that can extract features using hog sub-sampling and make predictions
@@ -104,6 +108,13 @@ def draw_labeled_bboxes(image, labels):
         # Identify x and y values of those pixels
         nonzeroy = np.array(nonzero[0])
         nonzerox = np.array(nonzero[1])
+        #print("\nframe:", frame, "car:", car_number, "sum:", np.sum(nonzero))
+        # bail if we don't meet a threshold
+        if np.sum(nonzero) < 9000000:
+            continue
+
+        if DEBUG:
+            print("\nframe:", frame, "car:", car_number, "sum:", np.sum(nonzero))
         # Define a bounding box based on min/max x and y
         bbox = ((np.min(nonzerox), np.min(nonzeroy)), (np.max(nonzerox), np.max(nonzeroy)))
         # Draw the box on the image
@@ -113,26 +124,45 @@ def draw_labeled_bboxes(image, labels):
 
 
 def process_image(img):
+    global frame
+    frame += 1
     # Get a heatmap of detected cars
-    heatmaps.append(find_cars(img, ystart, ystop, scale, svc, X_scaler, colorspace, orient, pix_per_cell, cell_per_block,
-                     hog_channel, spatial_size, hist_bins, hist_range))
+    heatmaps.append(find_cars(img, ystart, ystop, scale, svc, X_scaler, colorspace, orient, pix_per_cell, cell_per_block, hog_channel, spatial_size, hist_bins, hist_range))
 
     if len(heatmaps) > heat_smoothing:
         heatmaps.pop(0)
 
+    if DEBUG:
+        # # Visualize the heatmap
+        heatmap_img = np.clip(heatmaps[-1], 0, 255)
+        mpimg.imsave("./output_images/heatmap_pre_thresh" + str(frame), heatmap_img, cmap='hot')
+        # plt.imshow(heatmap, cmap='hot')
+        # plt.show()
+
     heat = np.sum(heatmaps, axis=0)
 
-    # Apply a threshold to the detections heatmap and zero out pixels below the threshold
+    # Apply a first-level threshold to the detections heatmap and zero out pixels below the threshold
     heat[heat <= heat_threshold] = 0
+
+    if DEBUG:
+        # # Visualize the heatmap
+        heatmap_img = np.clip(heat, 0, 255)
+        mpimg.imsave("./output_images/heatmap_post_thresh" + str(frame), heatmap_img, cmap='hot')
+        # plt.imshow(heatmap[-1], cmap='hot')
+        # plt.show()
 
     # Find final boxes from heatmap using label function
     labels = label(heat)
+
+
+
     return draw_labeled_bboxes(img, labels)
 
 
 def test_images():
-    global heatmaps, heat_threshold
-    heat_threshold = 2
+    global heatmaps, heat_threshold, heat_smoothing
+    heat_threshold = 1
+    heat_smoothing = 1
 
     # Get image filenames
     img_filenames = glob("./test_images/test*.jpg")
@@ -147,8 +177,10 @@ def test_images():
 
 
 def test_video():
-    global heatmaps, heat_threshold
-    heat_threshold = 50
+    global heatmaps, heat_threshold, heat_smoothing
+    heat_threshold = 20
+    heat_smoothing = 10
+
     # Clear heatmap
     heatmaps = []
     ## To speed up the testing process you may want to try your pipeline on a shorter subclip of the video
@@ -156,8 +188,8 @@ def test_video():
     ## Where start_second and end_second are integer values representing the start and end of the subclip
     ## You may also uncomment the following line for a subclip of the first 5 seconds
     #clip = VideoFileClip("./project_video.mp4").subclip(39, 42)
-    clip = VideoFileClip("./test_video.mp4")
-    #clip = VideoFileClip("./project_video.mp4")
+    #clip = VideoFileClip("./test_video.mp4")
+    clip = VideoFileClip("./project_video.mp4")
 
     # Process the video
     result = clip.fl_image(process_image)  # NOTE: this function expects color images!!
@@ -191,20 +223,12 @@ ystart = 400
 ystop = 656
 scale = 1.5
 
-heat_smoothing = 15
 
-# Load test image
-# img = mpimg.imread('./test_images/test1.jpg')
 
-test_images()
-#test_video()
+#test_images()
+frame = 0
+test_video()
 
-# plt.imshow(draw_img)
-# plt.show()
-#
-# # Visualize the heatmap when displaying
-# heatmap = np.clip(heat, 0, 255)
-#
-# plt.imshow(heatmap, cmap='hot')
-# plt.show()
+
+
 
