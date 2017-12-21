@@ -130,6 +130,7 @@ def draw_labeled_bboxes(image, heatmap):
 
         #heat = np.sum(heatmaps, axis=0)
 
+        # Apply second-level threshold based on amount of heat in box and box position on screen.
         heat_factor = (np.sum(heat) - (y.stop * 1000)) + 550000
 
         if DEBUG:
@@ -157,7 +158,8 @@ def draw_labeled_bboxes(image, heatmap):
     # Get heatmap that's the mean of stored heatmaps
     heatmap = np.mean(heatmaps, axis=0)
 
-    # Apply a first-level threshold to the detections heatmap and zero out pixels below the threshold
+    # Third-level filter
+    # Apply a threshold to the detections heatmap and zero out pixels below the threshold
     heatmap[heatmap <= 1] = 0
 
     labels = label(heatmap)
@@ -175,7 +177,7 @@ def draw_labeled_bboxes(image, heatmap):
         if DEBUG:
             print("\nframe:", frame, "heat2:", heat_factor)
 
-        return
+
 
 
         if heat_factor > 0:
@@ -349,6 +351,7 @@ ystop = 656
 scale = 1.5
 
 
+
 #test_images()
 frame = 0
 test_video()
@@ -357,4 +360,5 @@ test_video()
 # Play a sound when done (Mac OS specific file location)
 os.system("open /System/Library/Sounds/Glass.aiff")
 
-
+# Open the output video
+os.system("open output_images/output_video.mp4 ")
