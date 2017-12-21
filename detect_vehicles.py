@@ -13,6 +13,7 @@ from sklearn.externals import joblib
 from scipy.ndimage.measurements import label, find_objects
 from glob import glob
 from moviepy.editor import VideoFileClip
+import os
 
 from features import *
 
@@ -108,10 +109,11 @@ def draw_labeled_bboxes(image, heatmap):
     # Apply a first-level threshold to the detections heatmap and zero out pixels below the threshold
     heatmap[heatmap <= heat_threshold] = 0
 
-    # Find final boxes from heatmap using label function
+    # Find boxes from heatmap using label function
     labels = label(heatmap)
     detections = find_objects(labels[0])
 
+    # Filer heatmap based on heat factor of each box.
     for detection in detections:
         heat = heatmap[detection]
 
@@ -147,17 +149,13 @@ def draw_labeled_bboxes(image, heatmap):
             # print(detection)
 
 
-
-
-
-
-
-
+    # Store filtered heatmap
     heatmaps.append(output_heatmap)
     if len(heatmaps) > heat_smoothing:
         heatmaps.pop(0)
 
-    heatmap = np.sum(heatmaps, axis=0)
+    # Get heatmap that's the mean of stored heatmaps
+    heatmap = np.mean(heatmaps, axis=0)
 
     # Apply a first-level threshold to the detections heatmap and zero out pixels below the threshold
     heatmap[heatmap <= 1] = 0
@@ -171,10 +169,13 @@ def draw_labeled_bboxes(image, heatmap):
         y = detection[0]
 
         #heat_factor = (np.sum(heat) - (y.stop * 1000)) + 490000
-        heat_factor = (np.sum(heat) - (y.stop * 1000)) + 500000
+        #heat_factor = (np.sum(heat) - (y.stop * 1000)) + 500000
+        heat_factor = np.sum(heat)
 
         if DEBUG:
             print("\nframe:", frame, "heat2:", heat_factor)
+
+        return
 
 
         if heat_factor > 0:
@@ -348,11 +349,12 @@ ystop = 656
 scale = 1.5
 
 
-
 #test_images()
 frame = 0
 test_video()
 
 
+# Play a sound when done (Mac OS specific file location)
+os.system("open /System/Library/Sounds/Glass.aiff")
 
 
