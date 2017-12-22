@@ -8,7 +8,6 @@ import numpy as np
 import cv2
 
 import matplotlib.image as mpimg
-import matplotlib.pyplot as plt
 from sklearn.externals import joblib
 from scipy.ndimage.measurements import label, find_objects
 from glob import glob
@@ -19,11 +18,52 @@ from features import *
 
 DEBUG = True
 
-heat_threshold = 0
-heat_smoothing = 1
-heatmaps = []
-
+vehicles = []
+smoothing_factor = 1
 frame = 0
+
+
+# Define a class to receive the characteristics of each vehicle detection
+class Vehicle:
+    def __init__(self, position):
+
+        # Store vehicle positions
+        self.positions = [position]
+
+        # Store frames since seen
+        self.frames_since_seen = -1
+
+    # Compute mean position
+    def mean_position(self):
+        sum_x_start = 0
+        sum_x_stop = 0
+        sum_y_start = 0
+        sum_y_stop = 0
+
+        for pos in self.positions:
+            sum_x_start += pos["x"].start
+            sum_x_stop += pos["x"].stop
+            sum_y_start += pos["y"].start
+            sum_y_stop += pos["y"].stop
+
+        mean_pos = {
+            "x": {
+                "start": sum_x_start / len(self.positions),
+                "stop": sum_x_stop / len(self.positions)
+            },
+            "y": {
+                "start": sum_y_start / len(self.positions),
+                "stop": sum_y_stop / len(self.positions)
+            },
+        }
+        return mean_pos
+
+    # Compute mean size
+    def mean_size(self):
+        pos = self.mean_position()
+        size = (pos["x"]["stop"] - pos["x"]["start"]) * (pos["y"]["stop"] - pos["y"]["start"])
+        return size
+
 
 
 # Define a single function that can extract features using hog sub-sampling and make predictions
@@ -99,15 +139,20 @@ def find_cars(img, ystart, ystop, scale, svc, X_scaler, cspace, orient, pix_per_
 
     return heat
 
-# Returnd a copy of image with bounding boxes labeled
-def draw_labeled_bboxes(image, heatmap):
-    global heatmaps
-    img = np.copy(image)
 
-    output_heatmap = np.zeros_like(image[:,:,0]).astype(np.float)
+def update_vehicle_positions(heatmap):
+    global vehicles
+
+    #output_heatmap = np.zeros_like(image[:,:,0]).astype(np.float)
+    #output_heatmap[detection] = heat
 
     # Apply a first-level threshold to the detections heatmap and zero out pixels below the threshold
-    heatmap[heatmap <= heat_threshold] = 0
+    #heatmap[heatmap <= 1] = 0
+    heatmap_top = heatmap[:480, :]
+    heatmap_bottom = heatmap[480:, :]
+    heatmap_top[heatmap_top <= 1] = 0
+    heatmap_bottom[heatmap_bottom <= 2] = 0
+    heatmap = np.append(heatmap_top, heatmap_bottom, axis=0)
 
     # Find boxes from heatmap using label function
     labels = label(heatmap)
@@ -115,177 +160,121 @@ def draw_labeled_bboxes(image, heatmap):
 
     # Filer heatmap based on heat factor of each box.
     for detection in detections:
-        heat = heatmap[detection]
-
         x = detection[1]
         y = detection[0]
+        size = (x.stop - x.start) * (y.stop - y.start)
+        heat = np.sum(heatmap[detection])
 
-        # plt.imshow(heatmap, cmap='hot')
-        # plt.show()
-        #
-        # #heatmap[detection] = 0
-        #
-        # plt.imshow(heatmap, cmap='hot')
-        # plt.show()
+        #heat_factor = (((heat * 1.0) + (size * 10.0)) - (y.stop * 5000.0))
+        heat_factor = ((heat * 30.0) - (y.stop * 1000.0)) + 150000.0
 
-        #heat = np.sum(heatmaps, axis=0)
+        # See if we are already tracking a vehicle associated with this detection
+        matched_vehicles = []
+        for vehicle in vehicles:
+            vehicle_pos = vehicle.mean_position()
+            if x.start < vehicle_pos["x"]["stop"] and x.stop > vehicle_pos["x"]["start"] and y.start < vehicle_pos["y"]["stop"] and y.stop > vehicle_pos["y"]["start"]:
+                # detection overlaps with the vehicle
+                vehicle_size = vehicle.mean_size()
+                # Get percentage change in size of detection from size of vehicle
+                size_change = abs(size - vehicle_size) / vehicle_size
+                print("size change", size_change)
+                if size_change > .20:
+                    matched_vehicles.append(vehicle)
 
-        # Apply second-level threshold based on amount of heat in box and box position on screen.
-        heat_factor = (np.sum(heat) - (y.stop * 1000)) + 550000
+        if len(matched_vehicles) == 1:
+            vehicle = matched_vehicles[0]
+            # Detection matched exactly one vehicle, treat as an update
+            # Apply lessor threshold filtering for heat
+            if heat_factor > 0:
+                if DEBUG: print("\nframe:", frame, "old heat:", heat_factor, "kept")
+                # Add current detection to vehicle's position list
+                vehicle.positions.append({"x": x, "y": y})
+                if len(vehicle.positions) > smoothing_factor:
+                    vehicle.positions.pop(0)
+                vehicle.frames_since_seen = -1
+            else:
+                if DEBUG: print("\nframe:", frame, "old heat:", heat_factor, "dropped")
+        else:
+            # Detection matched either no or multiple vehicles, treat as new
+            # Apply stricter threshold filtering for heat
+            if heat_factor > 0:
+                if DEBUG: print("\nframe:", frame, "new heat:", heat_factor, "kept")
+                # Add current detection to vehicle's position list
+                vehicles.append(Vehicle({"x": x, "y": y}))
+            else:
+                if DEBUG: print("\nframe:", frame, "new heat:", heat_factor, "dropped")
 
-        if DEBUG:
-            print("\nframe:", frame, "heat1:", heat_factor)
+    # Increment frames since seen for all vehicles
+    for vehicle in vehicles:
+        vehicle.frames_since_seen += 1
 
+    # Drop vehicle if not seen in past n frames, where n = smoothing factor
+    vehicles[:] = [vehicle for vehicle in vehicles if not vehicle.frames_since_seen > smoothing_factor]
 
-        if heat_factor > 0:
-            output_heatmap[detection] = heat
-
-            # plt.imshow(test, cmap='hot')
-            # plt.show()
-            #
-            # plt.imshow(blah, cmap='hot')
-            # plt.show()
-
-            # print(np.sum(heat))
-            # print(detection)
-
-
-    # Store filtered heatmap
-    heatmaps.append(output_heatmap)
-    if len(heatmaps) > heat_smoothing:
-        heatmaps.pop(0)
-
-    # Get heatmap that's the mean of stored heatmaps
-    heatmap = np.mean(heatmaps, axis=0)
-
-    # Third-level filter
-    # Apply a threshold to the detections heatmap and zero out pixels below the threshold
-    heatmap[heatmap <= 1] = 0
-
-    labels = label(heatmap)
-    detections = find_objects(labels[0])
-    for detection in detections:
-        heat = heatmap[detection]
-
-        x = detection[1]
-        y = detection[0]
-
-        #heat_factor = (np.sum(heat) - (y.stop * 1000)) + 490000
-        #heat_factor = (np.sum(heat) - (y.stop * 1000)) + 500000
-        heat_factor = np.sum(heat)
-
-        if DEBUG:
-            print("\nframe:", frame, "heat2:", heat_factor)
-
-
-
-
-        if heat_factor > 0:
-            # output_heatmap[detection] = heat
-
-            # plt.imshow(test, cmap='hot')
-            # plt.show()
-            #
-            # plt.imshow(blah, cmap='hot')
-            # plt.show()
-
-            # print(np.sum(heat))
-            # print(detection)
-
-
-
+    # # Store filtered heatmap
+    # heatmaps.append(output_heatmap)
+    # if len(heatmaps) > heat_smoothing:
+    #     heatmaps.pop(0)
+    #
+    # # Get heatmap that's the mean of stored heatmaps
+    # heatmap = np.mean(heatmaps, axis=0)
+    #
+    # # Third-level filter
+    # # Apply a threshold to the detections heatmap and zero out pixels below the threshold
+    # heatmap[heatmap <= 1] = 0
+    #
+    # labels = label(heatmap)
+    # detections = find_objects(labels[0])
+    # for detection in detections:
+    #     heat = heatmap[detection]
+    #
+    #     x = detection[1]
+    #     y = detection[0]
+    #
+    #     #heat_factor = (np.sum(heat) - (y.stop * 1000)) + 490000
+    #     #heat_factor = (np.sum(heat) - (y.stop * 1000)) + 500000
+    #     heat_factor = np.sum(heat)
+    #
+    #     if DEBUG:
+    #         print("\nframe:", frame, "heat2:", heat_factor)
 
 
-            # Define a bounding box based on min/max x and y
-            bbox = ((x.start, y.start), (x.stop, y.stop))
-            # Draw the box on the image
-            cv2.rectangle(img, bbox[0], bbox[1], (0, 0, 255), 6)
 
-    # plt.imshow(test, cmap='hot')
-    # plt.show()
+
+# Returnd a copy of image with bounding boxes labeled
+def draw_bounding_boxes(image):
+    img = np.copy(image)
+
+    for vehicle in vehicles:
+        # Get the mean position for the vehicle
+        position = vehicle.mean_position()
+
+        # Define a bounding box based on min/max x and y and draw the box on the image
+        cv2.rectangle(img, (int(position["x"]["start"]), int(position["y"]["start"])), (int(position["x"]["stop"]), int(position["y"]["stop"])), (0, 0, 255), 6)
+
+    if DEBUG: mpimg.imsave("./output_images/frame" + str(frame) + ".jpg", img)
 
     # Return the image
     return img
 
 
 
-
-    # # Iterate through all detected cars
-    # for car_number in range(1, labels[1]+1):
-    #     # Find pixels with each car_number label value
-    #     nonzero = (labels[0] == car_number).nonzero()
-    #
-    #     # heatmap = heatmaps[-1]
-    #     # blah = labels[0] == car_number
-    #
-    #
-    #     # loc = find_objects(labels[0])
-    #     # test = heatmap[loc[0]]
-    #
-    #     # plt.imshow(test, cmap='hot')
-    #     # plt.show()
-    #
-    #     # plt.imshow(labels[0], cmap='gray')
-    #     # plt.show()
-    #
-    #     # Identify x and y values of those pixels
-    #     nonzeroy = np.array(nonzero[0])
-    #     nonzerox = np.array(nonzero[1])
-    #     #print("\nframe:", frame, "car:", car_number, "sum:", np.sum(nonzero))
-    #     # bail if we don't meet a threshold
-    #     # if np.sum(test) < 9000000:
-    #     #     continue
-    #
-    #     # if DEBUG:
-    #     #     print("\nframe:", frame, "car:", car_number)
-    #     # Define a bounding box based on min/max x and y
-    #     bbox = ((np.min(nonzerox), np.min(nonzeroy)), (np.max(nonzerox), np.max(nonzeroy)))
-    #
-    #     if DEBUG:
-    #         print("\nframe:", frame, "car:", car_number, "bbox:", bbox)
-    #
-    #     # Draw the box on the image
-    #     cv2.rectangle(img, bbox[0], bbox[1], (0,0,255), 6)
-    # # Return the image
-    # return img
-
-
 def process_image(img):
     global frame
     frame += 1
-    # Get a heatmap of detected cars
+
+    # Get a heatmap of detected vehicles
     heatmap = find_cars(img, ystart, ystop, scale, svc, X_scaler, colorspace, orient, pix_per_cell, cell_per_block, hog_channel, spatial_size, hist_bins, hist_range)
 
+    # Update vehicle positions
+    update_vehicle_positions(heatmap)
 
-
-    # if DEBUG:
-    #     # # Visualize the heatmap
-    #     heatmap_img = np.clip(heatmaps[-1], 0, 255)
-    #     mpimg.imsave("./output_images/heatmap_pre_thresh" + str(frame), heatmap_img, cmap='hot')
-    #     # plt.imshow(heatmap, cmap='hot')
-    #     # plt.show()
-    #
-    #
-    #
-    #
-    #
-    # if DEBUG:
-    #     # # Visualize the heatmap
-    #     heatmap_img = np.clip(heat, 0, 255)
-    #     mpimg.imsave("./output_images/heatmap_post_thresh" + str(frame), heatmap_img, cmap='hot')
-    #     # plt.imshow(heatmap[-1], cmap='hot')
-    #     # plt.show()
-
-
-
-
-
-    return draw_labeled_bboxes(img, heatmap)
+    # Draw vechicle boxes
+    return draw_bounding_boxes(img)
 
 
 def test_images():
-    global heatmaps, heat_threshold, heat_smoothing
-    heat_threshold = 1
+    global vehicles, heat_smoothing
     heat_smoothing = 1
 
     # Get image filenames
@@ -294,28 +283,30 @@ def test_images():
     for img_filename in img_filenames:
         # Load test image
         img = mpimg.imread(img_filename)
-        # Clear heatmap
-        heatmaps = []
+
+        # Clear vehicles
+        vehicles = []
+
         # Process image and write result
         mpimg.imsave("./output_images/" + img_filename.split("/")[-1], process_image(img))
 
 
 def test_video():
-    global heatmaps, heat_threshold, heat_smoothing
-    heat_threshold = 1
-    heat_smoothing = 15
+    global vehicles, heat_smoothing
+    heat_smoothing = 1
 
-    # Clear heatmap
-    heatmaps = []
+    # Clear vehicles
+    vehicles = []
+
     ## To speed up the testing process you may want to try your pipeline on a shorter subclip of the video
     ## To do so add .subclip(start_second,end_second) to the end of the line below
     ## Where start_second and end_second are integer values representing the start and end of the subclip
     ## You may also uncomment the following line for a subclip of the first 5 seconds
 
-    clip = VideoFileClip("./project_video.mp4").subclip(25, 28)
+    #clip = VideoFileClip("./project_video.mp4").subclip(25, 28)
     #clip = VideoFileClip("./project_video.mp4").subclip(45, 50)
 
-    #clip = VideoFileClip("./test_video.mp4")
+    clip = VideoFileClip("./test_video.mp4")
     #clip = VideoFileClip("./project_video.mp4")
 
     # Process the video
@@ -352,9 +343,9 @@ scale = 1.5
 
 
 
-#test_images()
+test_images()
 frame = 0
-test_video()
+#test_video()
 
 
 # Play a sound when done (Mac OS specific file location)
