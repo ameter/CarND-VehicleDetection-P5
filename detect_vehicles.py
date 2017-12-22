@@ -31,7 +31,7 @@ class Vehicle:
         self.positions = [position]
 
         # Store frames since seen
-        self.frames_since_seen = -1
+        self.frames_since_seen = 0
 
     # Compute mean position
     def mean_position(self):
@@ -67,7 +67,12 @@ class Vehicle:
 
 
 # Define a single function that can extract features using hog sub-sampling and make predictions
-def find_cars(img, ystart, ystop, scale, svc, X_scaler, cspace, orient, pix_per_cell, cell_per_block, hog_channel, spatial_size, hist_bins, hist_range):
+def find_cars(img, svc, X_scaler, cspace, orient, pix_per_cell, cell_per_block, hog_channel, spatial_size, hist_bins, hist_range):
+    # Set search parameters
+    ystart = 350
+    ystop = 656
+    scale = 1.5
+
     #draw_img = np.copy(img)
     heat = np.zeros_like(img[:,:,0]).astype(np.float)
     img = img.astype(np.float32) / 255
@@ -146,12 +151,20 @@ def update_vehicle_positions(heatmap):
     #output_heatmap = np.zeros_like(image[:,:,0]).astype(np.float)
     #output_heatmap[detection] = heat
 
+    # Increment frames since seen for all vehicles
+    for vehicle in vehicles:
+        vehicle.frames_since_seen += 1
+
+    # Drop vehicle if not seen in past n frames, where n = smoothing factor
+    vehicles[:] = [vehicle for vehicle in vehicles if not vehicle.frames_since_seen >= smoothing_factor]
+
+
     # Apply a first-level threshold to the detections heatmap and zero out pixels below the threshold
     #heatmap[heatmap <= 1] = 0
     heatmap_top = heatmap[:480, :]
     heatmap_bottom = heatmap[480:, :]
     heatmap_top[heatmap_top <= 1] = 0
-    heatmap_bottom[heatmap_bottom <= 2] = 0
+    heatmap_bottom[heatmap_bottom <= 6] = 0
     heatmap = np.append(heatmap_top, heatmap_bottom, axis=0)
 
     # Find boxes from heatmap using label function
@@ -178,8 +191,8 @@ def update_vehicle_positions(heatmap):
                 # Get percentage change in size of detection from size of vehicle
                 size_change = abs(size - vehicle_size) / vehicle_size
                 print("size change", size_change)
-                if size_change > .20:
-                    matched_vehicles.append(vehicle)
+                # if size_change > .20:
+                matched_vehicles.append(vehicle)
 
         if len(matched_vehicles) == 1:
             vehicle = matched_vehicles[0]
@@ -191,11 +204,12 @@ def update_vehicle_positions(heatmap):
                 vehicle.positions.append({"x": x, "y": y})
                 if len(vehicle.positions) > smoothing_factor:
                     vehicle.positions.pop(0)
-                vehicle.frames_since_seen = -1
+                vehicle.frames_since_seen = 0
             else:
                 if DEBUG: print("\nframe:", frame, "old heat:", heat_factor, "dropped")
-        else:
-            # Detection matched either no or multiple vehicles, treat as new
+        elif len(matched_vehicles) == 0:
+            # Detection did not match a vehicle, treat as new
+            # Note, we are dropping detections that match multiple vehicles
             # Apply stricter threshold filtering for heat
             if heat_factor > 0:
                 if DEBUG: print("\nframe:", frame, "new heat:", heat_factor, "kept")
@@ -204,12 +218,6 @@ def update_vehicle_positions(heatmap):
             else:
                 if DEBUG: print("\nframe:", frame, "new heat:", heat_factor, "dropped")
 
-    # Increment frames since seen for all vehicles
-    for vehicle in vehicles:
-        vehicle.frames_since_seen += 1
-
-    # Drop vehicle if not seen in past n frames, where n = smoothing factor
-    vehicles[:] = [vehicle for vehicle in vehicles if not vehicle.frames_since_seen > smoothing_factor]
 
     # # Store filtered heatmap
     # heatmaps.append(output_heatmap)
@@ -246,6 +254,11 @@ def draw_bounding_boxes(image):
     img = np.copy(image)
 
     for vehicle in vehicles:
+        # If we're smoothing, ensure we've had more than one detection for the vehicle
+        if smoothing_factor > 1:
+            if len(vehicle.positions) < 5:
+                continue
+
         # Get the mean position for the vehicle
         position = vehicle.mean_position()
 
@@ -264,7 +277,7 @@ def process_image(img):
     frame += 1
 
     # Get a heatmap of detected vehicles
-    heatmap = find_cars(img, ystart, ystop, scale, svc, X_scaler, colorspace, orient, pix_per_cell, cell_per_block, hog_channel, spatial_size, hist_bins, hist_range)
+    heatmap = find_cars(img, svc, X_scaler, colorspace, orient, pix_per_cell, cell_per_block, hog_channel, spatial_size, hist_bins, hist_range)
 
     # Update vehicle positions
     update_vehicle_positions(heatmap)
@@ -274,8 +287,8 @@ def process_image(img):
 
 
 def test_images():
-    global vehicles, heat_smoothing
-    heat_smoothing = 1
+    global vehicles, smoothing_factor
+    smoothing_factor = 1
 
     # Get image filenames
     img_filenames = glob("./test_images/test*.jpg")
@@ -292,8 +305,8 @@ def test_images():
 
 
 def test_video():
-    global vehicles, heat_smoothing
-    heat_smoothing = 1
+    global vehicles, smoothing_factor
+    smoothing_factor = 10
 
     # Clear vehicles
     vehicles = []
@@ -305,8 +318,9 @@ def test_video():
 
     #clip = VideoFileClip("./project_video.mp4").subclip(25, 28)
     #clip = VideoFileClip("./project_video.mp4").subclip(45, 50)
+    clip = VideoFileClip("./project_video.mp4").subclip(5, 12)
 
-    clip = VideoFileClip("./test_video.mp4")
+    #clip = VideoFileClip("./test_video.mp4")
     #clip = VideoFileClip("./project_video.mp4")
 
     # Process the video
@@ -336,20 +350,14 @@ spatial_size = dist_pickle["spatial_size"]
 hist_bins = dist_pickle["hist_bins"]
 hist_range = dist_pickle["hist_range"]
 
-# Set search parameters
-ystart = 350
-ystop = 656
-scale = 1.5
-
 
 
 test_images()
 frame = 0
-#test_video()
+test_video()
 
 
 # Play a sound when done (Mac OS specific file location)
 os.system("open /System/Library/Sounds/Glass.aiff")
 
-# Open the output video
-os.system("open output_images/output_video.mp4 ")
+
