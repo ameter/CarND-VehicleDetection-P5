@@ -71,13 +71,14 @@ def find_cars(img, svc, X_scaler, cspace, orient, pix_per_cell, cell_per_block, 
     # Set search parameters
     ystart = 350
     ystop = 656
+    xstart = 459
     scale = 1.5
 
     #draw_img = np.copy(img)
     heat = np.zeros_like(img[:,:,0]).astype(np.float)
     img = img.astype(np.float32) / 255
 
-    img_tosearch = img[ystart:ystop, :, :]
+    img_tosearch = img[ystart:ystop, xstart:, :]
     ctrans_tosearch = convert_color(img_tosearch, cspace)
     if scale != 1:
         imshape = ctrans_tosearch.shape
@@ -139,7 +140,7 @@ def find_cars(img, svc, X_scaler, cspace, orient, pix_per_cell, cell_per_block, 
                 win_draw = np.int(window * scale)
                 #cv2.rectangle(draw_img, (xbox_left, ytop_draw + ystart), (xbox_left + win_draw, ytop_draw + win_draw + ystart), (0, 0, 255), 6)
                 # Generate a heatmap of detections for this image
-                box = [[xbox_left, ytop_draw + ystart],[xbox_left + win_draw, ytop_draw + win_draw + ystart]]
+                box = [[xbox_left + xstart, ytop_draw + ystart],[xbox_left + win_draw + xstart, ytop_draw + win_draw + ystart]]
                 heat[box[0][1]:box[1][1], box[0][0]:box[1][0]] += 1
 
     return heat
