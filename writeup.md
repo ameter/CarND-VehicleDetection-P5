@@ -38,9 +38,9 @@ You're reading it!
 
 #### 1. Explain how (and identify where in your code) you extracted HOG features from the training images.
 
-The code for this step is contained in lines 27 through 39 of the file called `./features.py`).  
+The code for this step is contained in lines 27 through 39 of the file called `./features.py`), and it's called on lines 39 and 43 of `./train_model.py`.
 
-I started by reading in all the `vehicle` and `non-vehicle` images.  Here is an example of one of each of the `vehicle` and `non-vehicle` classes:
+I started by reading in all the `vehicle` and `non-vehicle` images (lines 82-85 of `./train_model.py`).  Here is an example of one of each of the `vehicle` and `non-vehicle` classes:
 
 ![alt text][image1]
 
@@ -54,11 +54,11 @@ Here is an example using the `YCrCb` color space and HOG parameters of `orientat
 
 #### 2. Explain how you settled on your final choice of HOG parameters.
 
-I tried various combinations of parameters and...
+I settled on my final choice of HOG parameters through trial and error.  I tried various combinations of parameters and color spaces, including RGB, HSV, HLS, and YCrCb color spaces, and the above combination produced the best results, acheiving approximately 98% prediction accuracy on the test set.
 
 #### 3. Describe how (and identify where in your code) you trained a classifier using your selected HOG features (and color features if you used them).
 
-I trained a linear SVM using...
+I trained a linear SVM classifier (lines 112-118 of `./train_model.py`) using the HOG features discussed above, as well as spatially binned color features (lines 42-46 of `./features.py`) and color histogram features (lines 49-57 of `./features.py`).
 
 ### Sliding Window Search
 
