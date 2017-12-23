@@ -16,7 +16,7 @@ import os
 
 from features import *
 
-DEBUG = True
+DEBUG = False
 
 vehicles = []
 smoothing_factor = 1
@@ -159,14 +159,16 @@ def update_vehicle_positions(heatmap):
     # Drop vehicle if not seen in past n frames, where n = smoothing factor
     vehicles[:] = [vehicle for vehicle in vehicles if not vehicle.frames_since_seen >= smoothing_factor]
 
-
     # Apply a first-level threshold to the detections heatmap and zero out pixels below the threshold
     #heatmap[heatmap <= 1] = 0
-    heatmap_top = heatmap[:480, :]
-    heatmap_bottom = heatmap[480:, :]
-    heatmap_top[heatmap_top <= 1] = 0
-    heatmap_bottom[heatmap_bottom <= 6] = 0
-    heatmap = np.append(heatmap_top, heatmap_bottom, axis=0)
+    heatmap_top = heatmap[:400, :]
+    heatmap_middle = heatmap[400:490, :]
+    heatmap_bottom = heatmap[490:, :]
+    heatmap_top[heatmap_top <= 3] = 0
+    heatmap_middle[heatmap_middle <= 1] = 0
+    heatmap_bottom[heatmap_bottom <= 4] = 0
+    heatmap = np.append(heatmap_top, heatmap_middle, axis=0)
+    heatmap = np.append(heatmap, heatmap_bottom, axis=0)
 
     # Find boxes from heatmap using label function
     labels = label(heatmap)
@@ -188,11 +190,6 @@ def update_vehicle_positions(heatmap):
             vehicle_pos = vehicle.mean_position()
             if x.start < vehicle_pos["x"]["stop"] and x.stop > vehicle_pos["x"]["start"] and y.start < vehicle_pos["y"]["stop"] and y.stop > vehicle_pos["y"]["start"]:
                 # detection overlaps with the vehicle
-                vehicle_size = vehicle.mean_size()
-                # Get percentage change in size of detection from size of vehicle
-                size_change = abs(size - vehicle_size) / vehicle_size
-                print("size change", size_change)
-                # if size_change > .20:
                 matched_vehicles.append(vehicle)
 
         if len(matched_vehicles) == 1:
@@ -201,9 +198,19 @@ def update_vehicle_positions(heatmap):
             # Apply lessor threshold filtering for heat
             if heat_factor > 0:
                 if DEBUG: print("\nframe:", frame, "old heat:", heat_factor, "kept")
+                vehicle_size = vehicle.mean_size()
+                # Get percentage change in size of detection from size of vehicle
+                size_change = abs(size - vehicle_size) / vehicle_size
+                #print("\nsize change", size_change)
+                if size_change > .35:
+                    if len(vehicle.positions) > 5:
+                        vehicle.positions.pop(0)
+                    # if len(vehicle.positions) == 0:
+                    #     vehicles.pop(vehicles.index(vehicle))
+                    continue
                 # Add current detection to vehicle's position list
                 vehicle.positions.append({"x": x, "y": y})
-                if len(vehicle.positions) > smoothing_factor:
+                if len(vehicle.positions) > smoothing_factor / 3:
                     vehicle.positions.pop(0)
                 vehicle.frames_since_seen = 0
             else:
@@ -220,36 +227,6 @@ def update_vehicle_positions(heatmap):
                 if DEBUG: print("\nframe:", frame, "new heat:", heat_factor, "dropped")
 
 
-    # # Store filtered heatmap
-    # heatmaps.append(output_heatmap)
-    # if len(heatmaps) > heat_smoothing:
-    #     heatmaps.pop(0)
-    #
-    # # Get heatmap that's the mean of stored heatmaps
-    # heatmap = np.mean(heatmaps, axis=0)
-    #
-    # # Third-level filter
-    # # Apply a threshold to the detections heatmap and zero out pixels below the threshold
-    # heatmap[heatmap <= 1] = 0
-    #
-    # labels = label(heatmap)
-    # detections = find_objects(labels[0])
-    # for detection in detections:
-    #     heat = heatmap[detection]
-    #
-    #     x = detection[1]
-    #     y = detection[0]
-    #
-    #     #heat_factor = (np.sum(heat) - (y.stop * 1000)) + 490000
-    #     #heat_factor = (np.sum(heat) - (y.stop * 1000)) + 500000
-    #     heat_factor = np.sum(heat)
-    #
-    #     if DEBUG:
-    #         print("\nframe:", frame, "heat2:", heat_factor)
-
-
-
-
 # Returnd a copy of image with bounding boxes labeled
 def draw_bounding_boxes(image):
     img = np.copy(image)
@@ -262,6 +239,10 @@ def draw_bounding_boxes(image):
 
         # Get the mean position for the vehicle
         position = vehicle.mean_position()
+
+        # Make sure position is reasonable
+        if position["x"]["start"] < 640:
+            continue
 
         # Define a bounding box based on min/max x and y and draw the box on the image
         cv2.rectangle(img, (int(position["x"]["start"]), int(position["y"]["start"])), (int(position["x"]["stop"]), int(position["y"]["stop"])), (0, 0, 255), 6)
@@ -307,7 +288,7 @@ def test_images():
 
 def test_video():
     global vehicles, smoothing_factor
-    smoothing_factor = 10
+    smoothing_factor = 30
 
     # Clear vehicles
     vehicles = []
@@ -317,12 +298,12 @@ def test_video():
     ## Where start_second and end_second are integer values representing the start and end of the subclip
     ## You may also uncomment the following line for a subclip of the first 5 seconds
 
-    #clip = VideoFileClip("./project_video.mp4").subclip(25, 28)
+    #clip = VideoFileClip("./project_video.mp4").subclip(29, 40)
     #clip = VideoFileClip("./project_video.mp4").subclip(45, 50)
-    clip = VideoFileClip("./project_video.mp4").subclip(5, 12)
+    #clip = VideoFileClip("./project_video.mp4").subclip(5, 12)
 
     #clip = VideoFileClip("./test_video.mp4")
-    #clip = VideoFileClip("./project_video.mp4")
+    clip = VideoFileClip("./project_video.mp4")
 
     # Process the video
     result = clip.fl_image(process_image)  # NOTE: this function expects color images!!
