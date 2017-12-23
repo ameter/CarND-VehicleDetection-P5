@@ -15,8 +15,8 @@ The goals / steps of this project are the following:
 [image1]: ./writeup_images/vehicle.png
 [image2]: ./writeup_images/non-vehicle.png
 [image3]: ./writeup_images/hog.jpg
+[image4]: ./writeup_images/raw-detections.png
 
-[image2]: ./examples/HOG_example.jpg
 [image3]: ./examples/sliding_windows.jpg
 [image4]: ./examples/sliding_window.jpg
 [image5]: ./examples/bboxes_and_heat.png
@@ -44,7 +44,7 @@ I started by reading in all the `vehicle` and `non-vehicle` images (lines 82-85 
 
 ![alt text][image1]
 
-![alt text][image1]
+![alt text][image2]
 
 I then explored different color spaces and different `skimage.hog()` parameters (`orientations`, `pixels_per_cell`, and `cells_per_block`).  I grabbed random images from each of the two classes and displayed them to get a feel for what the `skimage.hog()` output looks like.
 
@@ -58,19 +58,17 @@ I settled on my final choice of HOG parameters through trial and error.  I tried
 
 #### 3. Describe how (and identify where in your code) you trained a classifier using your selected HOG features (and color features if you used them).
 
-I trained a linear SVM classifier (lines 112-118 of `./train_model.py`) using the HOG features discussed above, as well as spatially binned color features (lines 42-46 of `./features.py`) and color histogram features (lines 49-57 of `./features.py`).
+I trained a linear SVM classifier (lines 112-118 of `./train_model.py`) using the HOG features discussed above, as well as spatially binned color features (lines 42-46 of `./features.py`) and color histogram features (lines 49-57 of `./features.py`).  I used GridSearchCV (lines 112-114 of `./train_model.py` to optimize the C value for the linear SVM classifier.
 
 ### Sliding Window Search
 
 #### 1. Describe how (and identify where in your code) you implemented a sliding window search.  How did you decide what scales to search and how much to overlap windows?
 
-I decided to search random window positions at random scales all over the image and came up with this (ok just kidding I didn't actually ;):
-
-![alt text][image3]
+I implemented a sliding window search of in input images (lines 70-146 of `./detect_vehicles.py`).  I searched the region of the image from just above the horizen down to slightly in front of the camera (ystart = 350, ystop = 656) and ignored the opposite side of the road (xstart = 459).  I tested different scales, and settled on a scale of 1.5.
 
 #### 2. Show some examples of test images to demonstrate how your pipeline is working.  What did you do to optimize the performance of your classifier?
 
-Ultimately I searched on two scales using YCrCb 3-channel HOG features plus spatially binned color and histograms of color in the feature vector, which provided a nice result.  Here are some example images:
+Ultimately I searched on a scale of 1.5 using YCrCb 3-channel HOG features plus spatially binned color and histograms of color in the feature vector, which provided a nice result. I used GridSearchCV (lines 112-114 of `./train_model.py` to optimize the C value for the linear SVM classifier.  I also normalized features using StandardScaler() (lines 94-98 of `train_model.py`)  Here is an example of the raw output of my sliding window search:
 
 ![alt text][image4]
 ---
@@ -78,7 +76,7 @@ Ultimately I searched on two scales using YCrCb 3-channel HOG features plus spat
 ### Video Implementation
 
 #### 1. Provide a link to your final video output.  Your pipeline should perform reasonably well on the entire project video (somewhat wobbly or unstable bounding boxes are ok as long as you are identifying the vehicles most of the time with minimal false positives.)
-Here's a [link to my video result](./project_video.mp4)
+Here's a [link to my video result](./output_images/output_video.mp4)
 
 
 #### 2. Describe how (and identify where in your code) you implemented some kind of filter for false positives and some method for combining overlapping bounding boxes.
