@@ -16,13 +16,11 @@ The goals / steps of this project are the following:
 [image2]: ./writeup_images/non-vehicle.png
 [image3]: ./writeup_images/hog.jpg
 [image4]: ./writeup_images/raw-detections.png
-
-[image3]: ./examples/sliding_windows.jpg
-[image4]: ./examples/sliding_window.jpg
-[image5]: ./examples/bboxes_and_heat.png
-[image6]: ./examples/labels_map.png
-[image7]: ./examples/output_bboxes.png
-[video1]: ./project_video.mp4
+[image5]: ./writeup_images/input.png
+[image6]: ./writeup_images/heatmap.png
+[image7]: ./writeup_images/labels.png
+[image8]: ./writeup_images/output.png
+[video1]: ./output_images/output_video.mp4
 
 ## [Rubric](https://review.udacity.com/#!/rubrics/513/view) Points
 ### Here I will consider the rubric points individually and describe how I addressed each point in my implementation.  
