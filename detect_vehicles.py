@@ -74,7 +74,8 @@ def find_cars(img, svc, X_scaler, cspace, orient, pix_per_cell, cell_per_block, 
     xstart = 459
     scale = 1.5
 
-    #draw_img = np.copy(img)
+    if DEBUG: draw_img = np.copy(img)
+
     heat = np.zeros_like(img[:,:,0]).astype(np.float)
     img = img.astype(np.float32) / 255
 
@@ -138,11 +139,15 @@ def find_cars(img, svc, X_scaler, cspace, orient, pix_per_cell, cell_per_block, 
                 xbox_left = np.int(xleft * scale)
                 ytop_draw = np.int(ytop * scale)
                 win_draw = np.int(window * scale)
-                #cv2.rectangle(draw_img, (xbox_left, ytop_draw + ystart), (xbox_left + win_draw, ytop_draw + win_draw + ystart), (0, 0, 255), 6)
                 # Generate a heatmap of detections for this image
                 box = [[xbox_left + xstart, ytop_draw + ystart],[xbox_left + win_draw + xstart, ytop_draw + win_draw + ystart]]
                 heat[box[0][1]:box[1][1], box[0][0]:box[1][0]] += 1
 
+                if DEBUG: cv2.rectangle(draw_img, (xbox_left + xstart, ytop_draw + ystart), (xbox_left + win_draw + xstart, ytop_draw + win_draw + ystart), (0, 0, 255), 6)
+
+    if DEBUG:
+        mpimg.imsave("./output_images/raw_detections-" + str(frame) + ".jpg", draw_img)
+        mpimg.imsave("./output_images/raw_heat-" + str(frame) + ".jpg", heat, cmap="hot")
     return heat
 
 
@@ -170,9 +175,13 @@ def update_vehicle_positions(heatmap):
     heatmap = np.append(heatmap_top, heatmap_middle, axis=0)
     heatmap = np.append(heatmap, heatmap_bottom, axis=0)
 
+    if DEBUG: mpimg.imsave("./output_images/thresholded_heat-" + str(frame) + ".jpg", heatmap, cmap="hot")
+
     # Find boxes from heatmap using label function
     labels = label(heatmap)
     detections = find_objects(labels[0])
+
+    if DEBUG: mpimg.imsave("./output_images/labels-" + str(frame) + ".jpg", labels[0], cmap="gray")
 
     # Filer heatmap based on heat factor of each box.
     for detection in detections:
@@ -247,7 +256,9 @@ def draw_bounding_boxes(image):
         # Define a bounding box based on min/max x and y and draw the box on the image
         cv2.rectangle(img, (int(position["x"]["start"]), int(position["y"]["start"])), (int(position["x"]["stop"]), int(position["y"]["stop"])), (0, 0, 255), 6)
 
-    if DEBUG: mpimg.imsave("./output_images/frame" + str(frame) + ".jpg", img)
+    if DEBUG:
+        mpimg.imsave("./output_images/input-" + str(frame) + ".jpg", image)
+        mpimg.imsave("./output_images/output-" + str(frame) + ".jpg", img)
 
     # Return the image
     return img
@@ -298,11 +309,7 @@ def test_video():
     ## Where start_second and end_second are integer values representing the start and end of the subclip
     ## You may also uncomment the following line for a subclip of the first 5 seconds
 
-    #clip = VideoFileClip("./project_video.mp4").subclip(29, 40)
-    #clip = VideoFileClip("./project_video.mp4").subclip(45, 50)
-    #clip = VideoFileClip("./project_video.mp4").subclip(5, 12)
-
-    #clip = VideoFileClip("./test_video.mp4")
+    #clip = VideoFileClip("./project_video.mp4").subclip(38, 43)
     clip = VideoFileClip("./project_video.mp4")
 
     # Process the video
@@ -340,6 +347,6 @@ test_video()
 
 
 # Play a sound when done (Mac OS specific file location)
-os.system("open /System/Library/Sounds/Glass.aiff")
+#os.system("open /System/Library/Sounds/Glass.aiff")
 
 

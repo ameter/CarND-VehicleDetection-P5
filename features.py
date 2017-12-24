@@ -46,7 +46,7 @@ def bin_spatial(img, size=(32, 32)):
     return np.hstack((color1, color2, color3))
 
 # Compute color histogram features
-def color_hist(img, nbins=32, bins_range=(0, 256)):  # bins_range=(0, 256)
+def color_hist(img, nbins=32, bins_range=(0, 256)):
     # Compute the histogram of the color channels separately
     channel1_hist = np.histogram(img[:, :, 0], bins=nbins, range=bins_range)
     channel2_hist = np.histogram(img[:, :, 1], bins=nbins, range=bins_range)
