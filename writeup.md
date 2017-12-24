@@ -15,11 +15,13 @@ The goals / steps of this project are the following:
 [image1]: ./writeup_images/vehicle.png
 [image2]: ./writeup_images/non-vehicle.png
 [image3]: ./writeup_images/hog.jpg
-[image4]: ./writeup_images/raw-detections.png
-[image5]: ./writeup_images/input.png
-[image6]: ./writeup_images/heatmap.png
-[image7]: ./writeup_images/labels.png
-[image8]: ./writeup_images/output.png
+[image4]: ./writeup_images/raw-detections.jpg
+[image5]: ./writeup_images/input.jpg
+[image6]: ./writeup_images/raw_detections.jpg
+[image7]: ./writeup_images/raw_heat.jpg
+[image8]: ./writeup_images/thresholded_heat.jpg
+[image9]: ./writeup_images/labels.jpg
+[image10]: ./writeup_images/output.jpg
 [video1]: ./output_images/output_video.mp4
 
 ## [Rubric](https://review.udacity.com/#!/rubrics/513/view) Points
@@ -81,21 +83,25 @@ Here's a [link to my video result](./output_images/output_video.mp4)
 
 I recorded the positions of positive detections in each frame of the video (lines 137-143 of `detect_vehicles.py`).  From the positive detections I created a heatmap (line 144 of `detect_vehicles.py`) and then thresholded that map to identify vehicle positions (line 164-171 of `detect_vehicles.py`).  I then used `scipy.ndimage.measurements.label()` and `scipy.ndimage.measurements.find_objects()` to identify individual blobs in the heatmap (lines 174-175 of `detect_vehicles.py`).  I then assumed each blob corresponded to a vehicle.  I conducted a second level of false positive filtering based on the overall heat and position of the detections, determined whether they were for vehicles already being tracked, and then added the new positions to position arrays for either new or existing vehicles (lines 178-227 of `detect_vehicles.py`).  I created a `Vehicle` class to maintain data on each tracked vehicle (lines 27-65 of `detect_vehicles.py`).  Finally, I constructed bounding boxes to display the mean position of tracked vehicles smoothed over several frames (line 248 of `detect_vehicles.py`).
 
-Here's an example result showing the heatmap from a frame of video, the result of `scipy.ndimage.measurements.label()`, and the bounding boxes then overlaid on the frame of video:
+Here's an example result showing the processing pipeline for a single video frame:
 
 ### Input video frame:
 ![alt text][image5]
 
-### Heatmap:
+### Raw Detections:
 ![alt text][image6]
 
-### Output of `scipy.ndimage.measurements.label()` on the heatmap:
+### Raw Heatmap:
 ![alt text][image7]
 
-### Resulting bounding boxes:
+### Thresholded Heatmap:
 ![alt text][image8]
 
+### Labels:
+![alt text][image9]
 
+### Resulting bounding boxes:
+![alt text][image10]
 
 ---
 
