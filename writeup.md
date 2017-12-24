@@ -83,17 +83,19 @@ Here's a [link to my video result](./output_images/output_video.mp4)
 
 I recorded the positions of positive detections in each frame of the video (lines 137-143 of `detect_vehicles.py`).  From the positive detections I created a heatmap (line 144 of `detect_vehicles.py`) and then thresholded that map to identify vehicle positions (line 164-171 of `detect_vehicles.py`).  I then used `scipy.ndimage.measurements.label()` and `scipy.ndimage.measurements.find_objects()` to identify individual blobs in the heatmap (lines 174-175 of `detect_vehicles.py`).  I then assumed each blob corresponded to a vehicle.  I conducted a second level of false positive filtering based on the overall heat and position of the detections, determined whether they were for vehicles already being tracked, and then added the new positions to position arrays for either new or existing vehicles (lines 178-227 of `detect_vehicles.py`).  I created a `Vehicle` class to maintain data on each tracked vehicle (lines 27-65 of `detect_vehicles.py`).  Finally, I constructed bounding boxes to display the mean position of tracked vehicles smoothed over several frames (line 248 of `detect_vehicles.py`).
 
-Here's an example result showing the heatmap from a series of frames of video, the result of `scipy.ndimage.measurements.label()` and the bounding boxes then overlaid on the last frame of video:
+Here's an example result showing the heatmap from a frame of video, the result of `scipy.ndimage.measurements.label()`, and the bounding boxes then overlaid on the frame of video:
 
-### Here are six frames and their corresponding heatmaps:
-
+### Input video frame:
 ![alt text][image5]
 
-### Here is the output of `scipy.ndimage.measurements.label()` on the integrated heatmap from all six frames:
+### Heatmap:
 ![alt text][image6]
 
-### Here the resulting bounding boxes are drawn onto the last frame in the series:
+### Output of `scipy.ndimage.measurements.label()` on the heatmap:
 ![alt text][image7]
+
+### Resulting bounding boxes:
+![alt text][image8]
 
 
 
@@ -103,5 +105,8 @@ Here's an example result showing the heatmap from a series of frames of video, t
 
 #### 1. Briefly discuss any problems / issues you faced in your implementation of this project.  Where will your pipeline likely fail?  What could you do to make it more robust?
 
-Here I'll talk about the approach I took, what techniques I used, what worked and why, where the pipeline might fail and how I might improve it if I were going to pursue this project further.  
+I had a lot of trouble tuning my processing and thresholding such that false positives were filtered out without filtering out without losing tracking of vehicles.  I initally tried smoothing by storing several heatmaps and then combining them before passing the combined heatmap to labels().  However, I was unable to get consistently good, smooth results with this approach.  Ultimately, I switched to tracking multiple positions for detected vehicles in a `Vehicle` class, and using that to smooth the results.  This provided much better results.  I also applied different heat thresholds to different regions of the image, so, for example, I applied a lower threshold to detections new the horizon than to detections closer to the camera (lines 165-172 of `./detect_vehicles.py`). This was helpful in achieving more consistent results.
+
+Ultimately, my detection pipeline is tuned for the images and video included in this project.  To create a more robust solution, more data, including different weather, road, lighting conditions, etc. would need to be included and tested.
+
 
