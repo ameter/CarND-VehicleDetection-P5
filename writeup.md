@@ -15,7 +15,7 @@ The goals / steps of this project are the following:
 [image1]: ./writeup_images/vehicle.png
 [image2]: ./writeup_images/non-vehicle.png
 [image3]: ./writeup_images/hog.jpg
-[image4]: ./writeup_images/raw-detections.jpg
+[image4]: ./writeup_images/raw_detections.jpg
 [image5]: ./writeup_images/input.jpg
 [image6]: ./writeup_images/raw_detections.jpg
 [image7]: ./writeup_images/raw_heat.jpg
